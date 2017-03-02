@@ -1,0 +1,30 @@
+{
+  "name": "freimaurerei/yii2-amqp",
+  "description": "Yii2 extension wrapper to communicate with RabbitMQ server via AMQP. Inspired by t-kanstantsin/yii2-amqp",
+  "keywords": [
+    "yii2",
+    "php7",
+    "extension",
+    "amqp",
+    "RabbitMQ"
+  ],
+  "homepage": "https://github.com/freimaurerei/yii2-amqp",
+  "type": "yii2-extension",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "tisOO",
+      "email": "tiso@breakingbrain.org"
+    }
+  ],
+  "require": {
+    "php": ">=7.0.0",
+    "ext-amqp": ">=1.8.0",
+    "yiisoft/yii2": ">=2.0.6"
+  },
+  "autoload": {
+    "psr-4": {
+      "freimaurerei\\yii2\\amqp\\": "src"
+    }
+  }
+}
