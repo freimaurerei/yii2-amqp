@@ -3,7 +3,6 @@
 namespace freimaurerei\yii2\amqp\controllers;
 
 use freimaurerei\yii2\amqp\AMQP;
-use yii\base\InlineAction;
 use yii\console\Controller;
 use yii\base\InvalidConfigException;
 
@@ -72,7 +71,7 @@ abstract class QueueListener extends Controller
             if (method_exists($this, $methodName)) {
                 $method = new \ReflectionMethod($this, $methodName);
                 if ($method->isPublic() && $method->getName() === $methodName) {
-                    return new InlineAction($id, $this, $methodName);
+                    return new QueueAction($id, $this, $methodName);
                 }
             }
         }
