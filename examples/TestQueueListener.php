@@ -36,7 +36,7 @@ $amqp = new \freimaurerei\yii2\amqp\AMQP([
 class TestQueueListener extends \freimaurerei\yii2\amqp\controllers\QueueListener
 {
 
-    public function actionRunJob(...$args) : bool
+    protected function actionRunJob($args) : bool
     {
         var_dump($args);
         return true;

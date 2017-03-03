@@ -5,6 +5,7 @@ namespace freimaurerei\yii2\amqp\controllers;
 use freimaurerei\yii2\amqp\AMQP;
 use yii\console\Controller;
 use yii\base\InvalidConfigException;
+use yii\log\Logger;
 
 /**
  * Class QueueListener
@@ -30,6 +31,18 @@ abstract class QueueListener extends Controller
      * @var AMQP|string
      */
     public $amqp = 'amqp';
+
+    /**
+     * Time to sleep
+     * @var int
+     */
+    public $tts = 1;
+
+    /**
+     * Retry count
+     * @var int
+     */
+    public $maxRetryCount = 10;
 
     /**
      * @inheritdoc
@@ -68,13 +81,49 @@ abstract class QueueListener extends Controller
      */
     public function actionRun()
     {
-        $this->amqp->listenQueue($this->queueName, [$this, 'actionRunJob']);
+        $queue = $this->amqp->getQueue($this->queueName);
+        $tts = $this->tts;
+        $retryCount = 0;
+        if ($queue) {
+            while ($retryCount < $this->maxRetryCount) {
+                $queue->consume([$this, 'handleMessage']);
+                sleep($tts);
+                $tts <<= 1;
+            }
+        }
+    }
+
+    /**
+     * Message handler
+     * @param \AMQPEnvelope $envelope
+     * @param \AMQPQueue    $queue
+     * @return bool
+     */
+    public function handleMessage(\AMQPEnvelope $envelope, \AMQPQueue $queue)
+    {
+        if ($this->actionRunJob(\yii\helpers\Json::decode($envelope->getBody()))) {
+            $queue->ack($envelope->getDeliveryTag());
+            AMQP::$logger->log(json_encode([
+                'data'  => $envelope->getBody(),
+                'route' => $envelope->getRoutingKey(),
+                'status'  => AMQP::MESSAGE_STATUS_ACK
+            ]), Logger::LEVEL_INFO, AMQP::$logCategory);
+            return true;
+        } else {
+            $queue->nack($envelope->getDeliveryTag(), AMQP_REQUEUE);
+            AMQP::$logger->log(json_encode([
+                'data'  => $envelope->getBody(),
+                'route' => $envelope->getRoutingKey(),
+                'status'  => AMQP::MESSAGE_STATUS_NACK
+            ]), Logger::LEVEL_INFO, AMQP::$logCategory);
+            return false;
+        }
     }
 
     /**
      * Handler
-     * @param array ...$args
+     * @param array $args
      * @return bool
      */
-    abstract public function actionRunJob(...$args) : bool;
+    abstract protected function actionRunJob($args) : bool;
 }
