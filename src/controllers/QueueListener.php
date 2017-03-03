@@ -60,7 +60,7 @@ abstract class QueueListener extends Controller
             );
         }
         if (!$this->queueName) {
-            $this->queueName = preg_replace('/(\w+)Controller/', '\\1', static::class);
+            $this->queueName = static::class;
             $this->amqp->getQueue($this->queueName);
         }
     }
