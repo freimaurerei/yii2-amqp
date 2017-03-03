@@ -68,19 +68,11 @@ abstract class QueueListener extends Controller
         if (isset($actionMap[$id])) {
             return \Yii::createObject($actionMap[$id], [$id, $this]);
         } elseif (preg_match('/^[a-z0-9\\-_]+$/', $id) && strpos($id, '--') === false && trim($id, '-') === $id) {
-            $methodName = 'handler' . str_replace(' ', '', ucwords(implode(' ', explode('-', $id))));
+            $methodName = 'action' . str_replace(' ', '', ucwords(implode(' ', explode('-', $id))));
             if (method_exists($this, $methodName)) {
                 $method = new \ReflectionMethod($this, $methodName);
                 if ($method->isPublic() && $method->getName() === $methodName) {
-                    return new QueueAction($id, $this, $methodName);
-                }
-            } else {
-                $methodName = 'action' . str_replace(' ', '', ucwords(implode(' ', explode('-', $id))));
-                if (method_exists($this, $methodName)) {
-                    $method = new \ReflectionMethod($this, $methodName);
-                    if ($method->isPublic() && $method->getName() === $methodName) {
-                        return new InlineAction($id, $this, $methodName);
-                    }
+                    return new InlineAction($id, $this, $methodName);
                 }
             }
         }
