@@ -2,6 +2,7 @@
 
 namespace freimaurerei\yii2\amqp\controllers;
 
+use freimaurerei\yii2\amqp\actions\QueueAction;
 use freimaurerei\yii2\amqp\AMQP;
 use yii\console\Controller;
 use yii\base\InvalidConfigException;

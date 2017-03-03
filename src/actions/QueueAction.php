@@ -1,6 +1,6 @@
 <?php
 
-namespace freimaurerei\yii2\amqp\controllers;
+namespace freimaurerei\yii2\amqp\actions;
 
 use yii\base\InlineAction;
 
