@@ -19,7 +19,7 @@ $amqp = new \freimaurerei\yii2\amqp\AMQP([
             ],
         ],
         'queues' => [
-            'test_queue' => [
+            'TestQueueListener::actionRunJob' => [
                 'binds' => [
                     'test_exchange' => [
                         'TestRoute',
@@ -36,7 +36,7 @@ $amqp = new \freimaurerei\yii2\amqp\AMQP([
 class TestQueueListener extends \freimaurerei\yii2\amqp\controllers\QueueListener
 {
 
-    protected function actionRunJob($args) : bool
+    public function actionRunJob($args) : bool
     {
         var_dump($args);
         return true;
@@ -48,6 +48,5 @@ $module = new \yii\base\Module(1, null, [
 
 $listener = new TestQueueListener('test', $module, [
     'amqp' => $amqp,
-    'queueName' => 'test_queue',
 ]);
-$listener->actionRun();
+$listener->actionRunJob(null);

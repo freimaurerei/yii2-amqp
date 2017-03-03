@@ -13,12 +13,6 @@ use yii\base\InvalidConfigException;
 abstract class QueueListener extends Controller
 {
     /**
-     * bind queue.
-     *
-     * @var string
-     */
-    public $queueName = '';
-    /**
      * break listen
      *
      * @var boolean
@@ -58,10 +52,31 @@ abstract class QueueListener extends Controller
                 sprintf('AMQP component must be defined and be instance of "%s".', AMQP::class)
             );
         }
-        if (!$this->queueName) {
-            $this->queueName = static::class;
-            $this->amqp->getQueue($this->queueName);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function createAction($id)
+    {
+        if ($id === '') {
+            $id = $this->defaultAction;
         }
+
+        $actionMap = $this->actions();
+        if (isset($actionMap[$id])) {
+            return \Yii::createObject($actionMap[$id], [$id, $this]);
+        } elseif (preg_match('/^[a-z0-9\\-_]+$/', $id) && strpos($id, '--') === false && trim($id, '-') === $id) {
+            $methodName = 'handler' . str_replace(' ', '', ucwords(implode(' ', explode('-', $id))));
+            if (method_exists($this, $methodName)) {
+                $method = new \ReflectionMethod($this, $methodName);
+                if ($method->isPublic() && $method->getName() === $methodName) {
+                    return new QueueAction($id, $this, $methodName);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -76,16 +91,17 @@ abstract class QueueListener extends Controller
     }
 
     /**
-     * Main action
+     * @param string $callable
      */
-    public function actionRun()
+    protected function listenQueue($callable)
     {
-        $queue = $this->amqp->getQueue($this->queueName);
+        $queueName = static::class . "::" . $callable;
+        $queue = $this->amqp->getQueue($queueName);
         $tts = $this->tts;
         $retryCount = 0;
         if ($queue) {
             while ($retryCount < $this->maxRetryCount) {
-                $queue->consume([$this, 'handleMessage']);
+                $queue->consume([$this, $callable]);
                 sleep($tts);
                 $tts <<= 1;
             }
@@ -93,6 +109,7 @@ abstract class QueueListener extends Controller
     }
 
     /**
+     * Routing key must be $className::$actionName
      * Message handler
      * @param \AMQPEnvelope $envelope
      * @param \AMQPQueue    $queue
@@ -100,7 +117,8 @@ abstract class QueueListener extends Controller
      */
     public function handleMessage(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
-        if ($this->actionRunJob(\yii\helpers\Json::decode($envelope->getBody()))) {
+        $action = str_replace(static::class, '', $envelope->getRoutingKey());
+        if ($this->$action(\yii\helpers\Json::decode($envelope->getBody()))) {
             $queue->ack($envelope->getDeliveryTag());
             \Yii::info(json_encode([
                 'data'  => $envelope->getBody(),
@@ -118,11 +136,4 @@ abstract class QueueListener extends Controller
             return false;
         }
     }
-
-    /**
-     * Handler
-     * @param array $args
-     * @return bool
-     */
-    abstract protected function actionRunJob($args) : bool;
 }

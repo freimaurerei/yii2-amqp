@@ -19,7 +19,7 @@ $amqp = new \freimaurerei\yii2\amqp\AMQP([
             ],
         ],
         'queues' => [
-            'test_queue' => [
+            'TestQueueListener::actionRunJob' => [
                 'binds' => [
                     'test_exchange' => [
                         'TestRoute',
