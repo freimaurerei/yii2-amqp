@@ -5,7 +5,6 @@ namespace freimaurerei\yii2\amqp\controllers;
 use freimaurerei\yii2\amqp\AMQP;
 use yii\console\Controller;
 use yii\base\InvalidConfigException;
-use yii\log\Logger;
 
 /**
  * Class QueueListener
@@ -103,19 +102,19 @@ abstract class QueueListener extends Controller
     {
         if ($this->actionRunJob(\yii\helpers\Json::decode($envelope->getBody()))) {
             $queue->ack($envelope->getDeliveryTag());
-            AMQP::$logger->log(json_encode([
+            \Yii::info(json_encode([
                 'data'  => $envelope->getBody(),
                 'route' => $envelope->getRoutingKey(),
                 'status'  => AMQP::MESSAGE_STATUS_ACK
-            ]), Logger::LEVEL_INFO, AMQP::$logCategory);
+            ]), AMQP::$logCategory);
             return true;
         } else {
             $queue->nack($envelope->getDeliveryTag(), AMQP_REQUEUE);
-            AMQP::$logger->log(json_encode([
+            \Yii::info(json_encode([
                 'data'  => $envelope->getBody(),
                 'route' => $envelope->getRoutingKey(),
                 'status'  => AMQP::MESSAGE_STATUS_NACK
-            ]), Logger::LEVEL_INFO, AMQP::$logCategory);
+            ]), AMQP::$logCategory);
             return false;
         }
     }

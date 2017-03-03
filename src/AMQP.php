@@ -5,7 +5,6 @@ namespace freimaurerei\yii2\amqp;
 use yii\base\Component;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Json;
-use yii\log\Logger;
 
 /**
  * Class AMQP
@@ -36,8 +35,6 @@ class AMQP extends Component
     public $config = [];
     /** @var string */
     public static $logCategory = __NAMESPACE__;
-    /** @var \yii\log\Logger */
-    public static $logger;
 
     /** @var \AMQPConnection $connection */
     protected $connection = null;
@@ -65,10 +62,6 @@ class AMQP extends Component
             $this->connection = $connection;
         } else {
             throw new \RuntimeException('Can\'t connect to AMQP');
-        }
-
-        if (!self::$logger) {
-            self::$logger = \Yii::getLogger();
         }
     }
 
@@ -273,11 +266,11 @@ class AMQP extends Component
         $this->applyPropertyHeaders($properties, $headers);
         $exchange = $this->getExchange($exchange);
         if ($exchange->publish($message, $routingKey, AMQP_NOPARAM, $properties)) {
-            self::$logger->log(json_encode([
+            \Yii::info(json_encode([
                 'data'  => $message,
                 'route' => $routingKey,
                 'status'  => self::MESSAGE_STATUS_ADDED
-            ]), Logger::LEVEL_INFO, self::$logCategory);
+            ]), self::$logCategory);
             return true;
         }
         return false;
