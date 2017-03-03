@@ -260,7 +260,8 @@ class AMQP extends Component
      * @return bool
      * @throws \ErrorException
      */
-    public function send(string $exchange, string $routingKey, $message, array $headers = null): bool {
+    public function send(string $exchange, string $routingKey, $message, array $headers = null): bool
+    {
         if ($message === null || $message === '') {
             throw new \ErrorException('AMQP message can not be empty');
         }
