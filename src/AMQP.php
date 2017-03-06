@@ -326,7 +326,7 @@ class AMQP extends Component
      * @return bool
      * @internal param null $channelName
      */
-    public function beginTransaction(\AMQPChannel $channel): bool
+    public function beginTransaction(\AMQPChannel $channel = null): bool
     {
         $channels = $channel ? [$channel,] : $this->channels;
 
