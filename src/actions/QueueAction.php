@@ -37,9 +37,9 @@ class QueueAction extends InlineAction
 
         /** @var QueueListener $controller */
         $controller = $this->controller;
-        $queueName = get_class($this->controller) . '::' . $this->actionMethod;
-        $queue = $controller->amqp->getQueue($queueName);
-        $tts = $controller->tts;
+        $queueName  = get_class($this->controller) . '::' . $this->actionMethod;
+        $queue      = $controller->amqp->getQueue($queueName);
+        $tts        = $controller->tts;
         $retryCount = 0;
         if ($queue) {
             while ($retryCount < $controller->maxRetryCount) {
@@ -48,7 +48,6 @@ class QueueAction extends InlineAction
                 $tts <<= 1;
             }
         }
-
 
         return 0;
     }
@@ -62,23 +61,22 @@ class QueueAction extends InlineAction
      */
     public function handleMessage(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
-
         \Yii::info("Handled message: " . $envelope->getBody());
 
         if ($this->controller->{$this->actionMethod}(\yii\helpers\Json::decode($envelope->getBody()))) {
             $queue->ack($envelope->getDeliveryTag());
             \Yii::info(json_encode([
-                'data'  => $envelope->getBody(),
-                'route' => $envelope->getRoutingKey(),
-                'status'  => AMQP::MESSAGE_STATUS_ACK
+                'data'   => $envelope->getBody(),
+                'route'  => $envelope->getRoutingKey(),
+                'status' => AMQP::MESSAGE_STATUS_ACK
             ]), AMQP::$logCategory);
             return true;
         } else {
             $queue->nack($envelope->getDeliveryTag(), AMQP_REQUEUE);
             \Yii::info(json_encode([
-                'data'  => $envelope->getBody(),
-                'route' => $envelope->getRoutingKey(),
-                'status'  => AMQP::MESSAGE_STATUS_NACK
+                'data'   => $envelope->getBody(),
+                'route'  => $envelope->getRoutingKey(),
+                'status' => AMQP::MESSAGE_STATUS_NACK
             ]), AMQP::$logCategory);
             return false;
         }
