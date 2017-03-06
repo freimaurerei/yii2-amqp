@@ -348,11 +348,12 @@ class AMQP extends Component
     {
         $transactionalChannels = $channel ? [$channel,] : $this->channels;
 
-        foreach ($transactionalChannels as $c) {
+        foreach ($transactionalChannels as $i=>$c) {
+            /** @var \AMQPChannel $c */
             if (!$c->commitTransaction()) {
                 return false;
             }
-            unset($this->transactionalChannels[$c]);
+            unset($this->transactionalChannels[$i]);
         }
 
         $this->isTransaction = false;
@@ -370,12 +371,12 @@ class AMQP extends Component
     {
         $transactionalChannels = $channel ? [$channel,] : $this->transactionalChannels;
 
-        foreach ($transactionalChannels as $c) {
-            /** @var \AMQPChannel $channel */
+        foreach ($transactionalChannels as $i=>$c) {
+            /** @var \AMQPChannel $c */
             if (!$c->rollbackTransaction()) {
                 return false;
             }
-            unset($this->transactionalChannels[$c]);
+            unset($this->transactionalChannels[$i]);
         }
 
         $this->isTransaction = false;
