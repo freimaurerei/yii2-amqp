@@ -332,7 +332,7 @@ class AMQP extends Component
 
         foreach ($channels as $c) {
             if (!$c->startTransaction()) {
-                $this->rollbackTransaction();
+                $this->rollback();
                 return false;
             }
             $this->transactionalChannels[] = $c;
@@ -346,7 +346,7 @@ class AMQP extends Component
      * @param \AMQPChannel|null $channel
      * @return bool
      */
-    public function commitTransaction(\AMQPChannel $channel = null): bool
+    public function commit(\AMQPChannel $channel = null): bool
     {
         $transactionalChannels = $channel ? [$channel,] : $this->channels;
 
@@ -366,7 +366,7 @@ class AMQP extends Component
      * @return bool
      * @internal param null $channelName
      */
-    public function rollbackTransaction(\AMQPChannel $channel = null)
+    public function rollback(\AMQPChannel $channel = null)
     {
         $transactionalChannels = $channel ? [$channel,] : $this->transactionalChannels;
 
