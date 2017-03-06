@@ -315,11 +315,6 @@ class AMQP extends Component
         return ArrayHelper::getValue($this->config, $exchange, []);
     }
 
-    public function isTransaction()
-    {
-        return !!$this->transactionalChannels;
-    }
-
     /**
      * Begin transaction
      * @param \AMQPChannel $channel
@@ -330,13 +325,16 @@ class AMQP extends Component
     {
         $channels = $channel ? [$channel,] : $this->channels;
 
-        foreach ($channels as $c) {
-            if (!$c->startTransaction()) {
-                $this->rollback();
-                return false;
+        if ($channels) {
+            foreach ($channels as $c) {
+                if (!$c->startTransaction()) {
+                    $this->rollback();
+                    return false;
+                }
+                $this->transactionalChannels[] = $c;
             }
-            $this->transactionalChannels[] = $c;
         }
+        $this->isTransaction = true;
 
         return true;
     }
@@ -356,6 +354,8 @@ class AMQP extends Component
             }
             unset($this->transactionalChannels[$c]);
         }
+
+        $this->isTransaction = false;
 
         return true;
     }
@@ -377,6 +377,8 @@ class AMQP extends Component
             }
             unset($this->transactionalChannels[$c]);
         }
+
+        $this->isTransaction = false;
 
         return true;
     }
