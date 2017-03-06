@@ -121,7 +121,7 @@ class AMQP extends Component
         if (!$channelId) {
             $channelId = 'default';
             $channel   = $this->createAMQPChannel($channelId);
-            if ($this->isTransaction()) {
+            if ($this->isTransaction) {
                 $this->beginTransaction($channel);
             }
         }
