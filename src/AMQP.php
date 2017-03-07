@@ -120,6 +120,9 @@ class AMQP extends Component
     {
         if (!$channelId) {
             $channelId = 'default';
+            if (isset($this->channels[$channelId])) {
+                return $this->channels[$channelId];
+            }
             $channel   = $this->createAMQPChannel($channelId);
             if ($this->isTransaction) {
                 $this->beginTransaction($channel);
@@ -327,11 +330,13 @@ class AMQP extends Component
 
         if ($channels) {
             foreach ($channels as $c) {
-                if (!$c->startTransaction()) {
-                    $this->rollback();
-                    return false;
+                if (!in_array($c, $this->transactionalChannels)) {
+                    if (!$c->startTransaction()) {
+                        $this->rollback();
+                        return false;
+                    }
+                    $this->transactionalChannels[] = $c;
                 }
-                $this->transactionalChannels[] = $c;
             }
         }
         $this->isTransaction = true;
