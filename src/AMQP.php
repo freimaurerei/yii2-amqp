@@ -272,7 +272,9 @@ class AMQP extends Component
             $message = Json::encode($message);
         }
 
-        $properties = [];
+        $properties = [
+            'delivery_mode' => 2
+        ];
         $this->applyPropertyHeaders($properties, $headers);
         $exchange = $this->getExchange($exchange);
         if ($exchange->publish($message, $routingKey, AMQP_NOPARAM, $properties)) {
