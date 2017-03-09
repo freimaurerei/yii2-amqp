@@ -63,7 +63,8 @@ class QueueAction extends InlineAction
     {
         \Yii::info("Handled message: " . $envelope->getBody());
 
-        if ($this->controller->{$this->actionMethod}(extract(\yii\helpers\Json::decode($envelope->getBody())))) {
+        if (call_user_func_array([$this->controller, $this->actionMethod],
+            \yii\helpers\Json::decode($envelope->getBody()))) {
             $queue->ack($envelope->getDeliveryTag());
             \Yii::info(json_encode([
                 'data'   => $envelope->getBody(),
