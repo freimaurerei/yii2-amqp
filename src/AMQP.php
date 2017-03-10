@@ -200,6 +200,9 @@ class AMQP extends Component
             $queue->declareQueue();
 
             foreach ($queueData['binds'] as $exchangeName => $aRoutingKeys) {
+                if (!isset($this->exchanges[$exchangeName])) {
+                    $this->makeExchange($exchangeName);
+                }
                 foreach ($aRoutingKeys as $routing_key) {
                     $queue->bind($exchangeName, $routing_key);
                 }
