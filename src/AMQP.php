@@ -163,15 +163,16 @@ class AMQP extends Component
                 throw new \RuntimeException("Could not find the exchange '$exchangeName' in config");
             }
 
-            $exchangeData = $this->config['exchanges'][$exchangeName];
-
             $exchange = new \AMQPExchange($this->getChannel());
-            $exchange->setName($exchangeName);
-            $exchange->setType($exchangeData['config']['type']);
-            $exchange->setFlags($exchangeData['config']['flags']);
-            $exchange->setArguments($exchangeData['config']['arguments'] ?? []);
 
-            $exchange->declareExchange();
+            if (isset($this->config['exchanges'][$exchangeName])) {
+                $exchange->setName($exchangeName);
+                $exchangeData = $this->config['exchanges'][$exchangeName];
+                $exchange->setType($exchangeData['config']['type']);
+                $exchange->setFlags($exchangeData['config']['flags']);
+                $exchange->setArguments($exchangeData['config']['arguments'] ?? []);
+                $exchange->declareExchange();
+            }
 
             $this->exchanges[$exchangeName] = $exchange;
         }
