@@ -13,7 +13,7 @@ class QueueAction extends InlineAction
      * AMQP component
      * @var AMQP
      */
-    private $amqp;
+    public $amqp;
 
     /**
      * Retry count
@@ -25,14 +25,6 @@ class QueueAction extends InlineAction
     {
         if (!$controller instanceof QueueListener) {
             throw new NotSupportedException();
-        }
-
-        if (isset($config['amqp'])) {
-            $this->amqp = $config['amqp'];
-        }
-
-        if (isset($config['retryCount'])) {
-            $this->retryCount = $config['retryCount'];
         }
 
         parent::__construct($id, $controller, $actionMethod, $config);
