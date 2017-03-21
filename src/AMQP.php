@@ -159,7 +159,7 @@ class AMQP extends Component
     protected function makeExchange(string $exchangeName): \AMQPExchange
     {
         if (!isset($this->exchanges[$exchangeName])) {
-            if (!isset($this->config['exchanges'][$exchangeName]) || $exchangeName !== '') {
+            if (!isset($this->config['exchanges'][$exchangeName]) && $exchangeName !== '') {
                 throw new \RuntimeException("Could not find the exchange '$exchangeName' in config");
             }
 
