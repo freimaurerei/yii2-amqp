@@ -9,11 +9,30 @@ use yii\base\NotSupportedException;
 
 class QueueAction extends InlineAction
 {
+    /**
+     * AMQP component
+     * @var AMQP
+     */
+    private $amqp;
+
+    /**
+     * Retry count
+     * @var int
+     */
+    public $retryCount = 5;
 
     public function __construct($id, $controller, $actionMethod, $config = [])
     {
         if (!$controller instanceof QueueListener) {
             throw new NotSupportedException();
+        }
+
+        if (isset($config['amqp'])) {
+            $this->amqp = $config['amqp'];
+        }
+
+        if (isset($config['retryCount'])) {
+            $this->retryCount = $config['retryCount'];
         }
 
         parent::__construct($id, $controller, $actionMethod, $config);
@@ -39,13 +58,9 @@ class QueueAction extends InlineAction
         $controller = $this->controller;
         $queueName  = get_class($this->controller) . '::' . $this->actionMethod;
         $queue      = $controller->amqp->getQueue($queueName);
-        $tts        = $controller->tts;
-        $retryCount = 0;
         if ($queue) {
-            while ($retryCount < $controller->maxRetryCount) {
-                $queue->consume([$this, 'handleMessage']);
-                sleep($tts);
-                $tts <<= 1;
+            while (true) {
+                $queue->consume([$this, 'handleMessage']); // todo think about this situation
             }
         }
 
@@ -63,23 +78,41 @@ class QueueAction extends InlineAction
     {
         \Yii::info("Handled message: " . $envelope->getBody());
 
-        if (call_user_func_array([$this->controller, $this->actionMethod],
-            \yii\helpers\Json::decode($envelope->getBody()))) {
-            $queue->ack($envelope->getDeliveryTag());
-            \Yii::info(json_encode([
+        $redeliveredCount = $envelope->getHeader('x-redelivered-count') ?: 0;
+
+        $result = true;
+
+        if ($redeliveredCount < $this->retryCount) {
+            // good
+            $result = call_user_func_array(
+                [$this->controller, $this->actionMethod],
+                \yii\helpers\Json::decode($envelope->getBody())
+            );
+            if ($result) {
+                \Yii::info(json_encode([
+                    'data'   => $envelope->getBody(),
+                    'route'  => $envelope->getRoutingKey(),
+                    'status' => AMQP::MESSAGE_STATUS_ACK
+                ]), AMQP::$logCategory);
+
+            } else {
+                $this->amqp->send('', $queue->getName(), $envelope->getBody(), ['x-redelivered-count' => ++$redeliveredCount]);
+                \Yii::info(json_encode([
+                    'data'   => $envelope->getBody(),
+                    'route'  => $envelope->getRoutingKey(),
+                    'status' => AMQP::MESSAGE_STATUS_NACK
+                ]), AMQP::$logCategory);
+            }
+        } else {
+            \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted." . json_encode([
                 'data'   => $envelope->getBody(),
                 'route'  => $envelope->getRoutingKey(),
                 'status' => AMQP::MESSAGE_STATUS_ACK
             ]), AMQP::$logCategory);
-            return true;
-        } else {
-            $queue->nack($envelope->getDeliveryTag(), AMQP_REQUEUE);
-            \Yii::info(json_encode([
-                'data'   => $envelope->getBody(),
-                'route'  => $envelope->getRoutingKey(),
-                'status' => AMQP::MESSAGE_STATUS_NACK
-            ]), AMQP::$logCategory);
-            return false;
         }
+
+        $queue->ack($envelope->getDeliveryTag());
+
+        return $result;
     }
 }

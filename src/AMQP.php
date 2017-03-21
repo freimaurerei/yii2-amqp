@@ -159,7 +159,7 @@ class AMQP extends Component
     protected function makeExchange(string $exchangeName): \AMQPExchange
     {
         if (!isset($this->exchanges[$exchangeName])) {
-            if (!isset($this->config['exchanges'][$exchangeName])) {
+            if (!isset($this->config['exchanges'][$exchangeName]) || $exchangeName !== '') {
                 throw new \RuntimeException("Could not find the exchange '$exchangeName' in config");
             }
 
@@ -253,7 +253,7 @@ class AMQP extends Component
     protected function applyPropertyHeaders(array &$properties, array $headers = null)
     {
         if ($headers !== null) {
-            $properties['application_headers'] = $headers;
+            $properties['headers'] = $headers;
         }
     }
 
