@@ -288,6 +288,8 @@ class AMQP extends Component
         $queue->setFlags(\AMQP_DURABLE);
         $queue->declareQueue();
         $this->delayedQueue = $queue;
+
+        $queue->bind($exchange->getName());
     }
 
     /**
