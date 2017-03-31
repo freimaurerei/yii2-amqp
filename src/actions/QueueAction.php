@@ -129,7 +129,8 @@ class QueueAction extends InlineAction
                         AMQP_NOPARAM,
                         [
                             'x-delay' => $delayedTime,
-                            'delivery_mode' => 2
+                            'delivery_mode' => 2,
+                            'x-redelivered-count' => $redeliveredCount
                         ]);
                 }
             } else {
