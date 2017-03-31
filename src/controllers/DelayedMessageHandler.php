@@ -47,5 +47,6 @@ class DelayedMessageHandler extends Controller
     public function handleMessage(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
         $this->amqp->send('', $envelope->getRoutingKey(), $envelope->getBody(), $envelope->getHeaders());
+        $queue->ack($envelope->getDeliveryTag());
     }
 }
