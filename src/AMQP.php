@@ -33,6 +33,12 @@ class AMQP extends Component
     public $password;
     /** @var array $config */
     public $config = [];
+    /** @var bool */
+    public $delayQueueUsage = false;
+    /** @var string  */
+    public $delayedExchangeName = 'delayed-exchange';
+    /** @var string */
+    public $delayedQueueName = 'delayed-queue';
     /** @var string */
     public static $logCategory = __NAMESPACE__;
 
@@ -48,6 +54,11 @@ class AMQP extends Component
     public $isTransaction = false;
 
     private $transactionalChannels = [];
+
+    /** @var \AMQPQueue */
+    private $delayedQueue = null;
+    /** @var \AMQPExchange */
+    private $delayedExchange = null;
 
     /**
      * @inheritdoc
@@ -66,6 +77,10 @@ class AMQP extends Component
             $this->connection = $connection;
         } else {
             throw new \RuntimeException('Can\'t connect to AMQP');
+        }
+
+        if ($this->delayQueueUsage) {
+            $this->makeDelayedQueue();
         }
     }
 
@@ -258,6 +273,23 @@ class AMQP extends Component
         }
     }
 
+    protected function makeDelayedQueue()
+    {
+        $exchange = new \AMQPExchange($this->getChannel());
+        $exchange->setName($this->delayedExchangeName);
+        $exchange->setType('x-delayed-message');
+        $exchange->setFlags(\AMQP_DURABLE);
+        $exchange->setArgument('x-delayed-type', \AMQP_EX_TYPE_FANOUT);
+        $exchange->declareExchange();
+        $this->delayedExchange = $exchange;
+
+        $queue = new \AMQPQueue($this->getChannel());
+        $queue->setName($this->delayedQueueName);
+        $queue->setFlags(\AMQP_DURABLE);
+        $queue->declareQueue();
+        $this->delayedQueue = $queue;
+    }
+
     /**
      * Send message by routingKey
      * @param string     $exchange
@@ -393,6 +425,22 @@ class AMQP extends Component
         $this->isTransaction = false;
 
         return true;
+    }
+
+    /**
+     * @return \AMQPQueue
+     */
+    public function getDelayedQueue()
+    {
+        return $this->delayedQueue;
+    }
+
+    /**
+     * @return \AMQPExchange
+     */
+    public function getDelayedExchange()
+    {
+        return $this->delayedExchange;
     }
 
 }

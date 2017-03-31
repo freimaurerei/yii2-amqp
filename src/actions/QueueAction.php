@@ -16,15 +16,39 @@ class QueueAction extends InlineAction
     public $amqp;
 
     /**
-     * Retry count
+     * todo description
      * @var int
      */
-    public $retryCount = 5;
+    protected $maxRetryCount = 10;
+
+    /**
+     * todo description
+     * Boundary retry count
+     * @var int
+     */
+    protected $retryBoundaryCount = 10;
+
+    /**
+     * In seconds
+     * @var int
+     */
+    protected $waitingTime = 10;
 
     public function __construct($id, $controller, $actionMethod, $config = [])
     {
         if (!$controller instanceof QueueListener) {
             throw new NotSupportedException();
+        }
+
+        $actionConfig = $controller->getActionConfig($actionMethod);
+        if (isset($actionConfig['maxRetryCount'])) {
+            $this->maxRetryCount = $actionConfig['maxRetryCount'];
+        }
+        if (isset($actionConfig['waitingTime'])) {
+            $this->waitingTime = $actionConfig['waitingTime'];
+        }
+        if (isset($actionConfig['retryBoundaryCount']) && $actionConfig['retryBoundaryCount'] <= $this->maxRetryCount) {
+            $this->retryBoundaryCount = $actionConfig['retryBoundaryCount'];
         }
 
         parent::__construct($id, $controller, $actionMethod, $config);
@@ -72,37 +96,51 @@ class QueueAction extends InlineAction
 
         $redeliveredCount = $envelope->getHeader('x-redelivered-count') ?: 0;
 
-        $result = true;
+        // good
+        $result = call_user_func_array(
+            [$this->controller, $this->actionMethod],
+            \yii\helpers\Json::decode($envelope->getBody())
+        );
+        if ($result) {
+            \Yii::info(json_encode([
+                'data'   => $envelope->getBody(),
+                'route'  => $envelope->getRoutingKey(),
+                'status' => AMQP::MESSAGE_STATUS_ACK
+            ]), AMQP::$logCategory);
+        } else {
+            ++$redeliveredCount;
+            if ($this->amqp->delayQueueUsage) {
+                if ($redeliveredCount > $this->maxRetryCount) {
+                    \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted." . json_encode([
+                            'data'   => $envelope->getBody(),
+                            'route'  => $envelope->getRoutingKey(),
+                            'status' => AMQP::MESSAGE_STATUS_ACK
+                        ]), AMQP::$logCategory);
+                } else {
+                    if ($this->retryBoundaryCount >= $redeliveredCount) {
+                        $delayedTime = $envelope->getHeader('x-delay');
+                    }
 
-        if ($redeliveredCount < $this->retryCount) {
-            // good
-            $result = call_user_func_array(
-                [$this->controller, $this->actionMethod],
-                \yii\helpers\Json::decode($envelope->getBody())
-            );
-            if ($result) {
-                \Yii::info(json_encode([
-                    'data'   => $envelope->getBody(),
-                    'route'  => $envelope->getRoutingKey(),
-                    'status' => AMQP::MESSAGE_STATUS_ACK
-                ]), AMQP::$logCategory);
+                    $delayedTime = $delayedTime ?? ($this->waitingTime * (2 << $redeliveredCount)) * 1000;
 
+                    $this->amqp->getDelayedExchange()->publish(
+                        $envelope->getBody(),
+                        $queue->getName(),
+                        AMQP_NOPARAM,
+                        [
+                            'x-delay' => $delayedTime,
+                            'delivery_mode' => 2
+                        ]);
+                }
             } else {
-                $this->amqp->send('', $queue->getName(), $envelope->getBody(), ['x-redelivered-count' => ++$redeliveredCount]);
+                $this->amqp->send('', $queue->getName(), $envelope->getBody(), ['x-redelivered-count' => $redeliveredCount]);
                 \Yii::info(json_encode([
                     'data'   => $envelope->getBody(),
                     'route'  => $envelope->getRoutingKey(),
                     'status' => AMQP::MESSAGE_STATUS_NACK
                 ]), AMQP::$logCategory);
             }
-        } else {
-            \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted." . json_encode([
-                'data'   => $envelope->getBody(),
-                'route'  => $envelope->getRoutingKey(),
-                'status' => AMQP::MESSAGE_STATUS_ACK
-            ]), AMQP::$logCategory);
         }
-
         $queue->ack($envelope->getDeliveryTag());
 
         return $result;

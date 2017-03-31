@@ -14,6 +14,31 @@ use yii\base\InvalidConfigException;
 abstract class QueueListener extends Controller
 {
     /**
+     * Actions config
+     * Example:
+     * $actionConfig = [
+     *      'actionImport' => [
+     *          'maxRetryCount' => 10,
+     *          'waitingTime' => 100,
+     *      ],
+     *      'actionDoingSomething' => [
+     *          'maxRetryCount' => 5,
+     *          'waitingTime' => 0
+     *      ],
+     * ];
+     * @var array
+     */
+    public $actionsConfig = [];
+
+    /**
+     * Default config for actions
+     */
+    const DEFAULT_ACTION_CONFIG = [
+        'maxRetryCount' => 5,
+        'waitingTime' => 10,
+    ];
+
+    /**
      * break listen
      *
      * @var boolean
@@ -37,6 +62,11 @@ abstract class QueueListener extends Controller
      * @var int
      */
     public $maxRetryCount = 10;
+
+    /**
+     * @var bool
+     */
+    public $useDelayQueue = false;
 
     /**
      * @inheritdoc
@@ -78,6 +108,11 @@ abstract class QueueListener extends Controller
         }
 
         return null;
+    }
+
+    public function getActionConfig($action)
+    {
+        return isset($this->actionsConfig[$action]) ? $this->actionsConfig[$action] : static::DEFAULT_ACTION_CONFIG;
     }
 
     /**
