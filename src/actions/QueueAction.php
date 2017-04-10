@@ -83,6 +83,39 @@ class QueueAction extends InlineAction
         return 0;
     }
 
+    public function bindActionParams($params)
+    {
+        $method = new \ReflectionMethod($this->controller, $this->actionMethod);
+
+        $args = [];
+        $missing = [];
+        $actionParams = [];
+        foreach ($method->getParameters() as $param) {
+            $name = $param->getName();
+            if (array_key_exists($name, $params)) {
+                if ($param->isArray()) {
+                    $args[] = $actionParams[$name] = (array) $params[$name];
+                } else {
+                    $args[] = $actionParams[$name] = $params[$name];
+                }
+                unset($params[$name]);
+            } elseif ($param->isDefaultValueAvailable()) {
+                $args[] = $actionParams[$name] = $param->getDefaultValue();
+            } else {
+                $missing[] = $name;
+            }
+        }
+
+        if (!empty($missing)) {
+            \Yii::info(\Yii::t('yii', 'Missing required parameters: {params}', [
+                'params' => implode(', ', $missing),
+            ]), AMQP::$logCategory);
+            return false;
+        }
+
+        return $args;
+    }
+
     /**
      * Routing key must be $className::$actionName
      * Message handler
@@ -96,10 +129,16 @@ class QueueAction extends InlineAction
 
         $redeliveredCount = $envelope->getHeader('x-redelivered-count') ?: 0;
 
+        $args = $this->bindActionParams(\yii\helpers\Json::decode($envelope->getBody()));
+
+        if ($args === false) {
+            return false;
+        }
+
         // good
         $result = call_user_func_array(
             [$this->controller, $this->actionMethod],
-            \yii\helpers\Json::decode($envelope->getBody())
+            $args
         );
         if ($result) {
             \Yii::info(json_encode([
@@ -111,7 +150,7 @@ class QueueAction extends InlineAction
             ++$redeliveredCount;
             if ($this->amqp->delayQueueUsage) {
                 if ($redeliveredCount > $this->maxRetryCount) {
-                    \Yii::info("Message could not be processed {$this->maxRetryCount} times. The message was deleted."
+                    \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted."
                         . json_encode([
                             'data'   => $envelope->getBody(),
                             'route'  => $envelope->getRoutingKey(),
