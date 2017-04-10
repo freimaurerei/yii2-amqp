@@ -111,7 +111,7 @@ class QueueAction extends InlineAction
             ++$redeliveredCount;
             if ($this->amqp->delayQueueUsage) {
                 if ($redeliveredCount > $this->maxRetryCount) {
-                    \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted."
+                    \Yii::info("Message could not be processed {$this->maxRetryCount} times. The message was deleted."
                         . json_encode([
                             'data'   => $envelope->getBody(),
                             'route'  => $envelope->getRoutingKey(),
