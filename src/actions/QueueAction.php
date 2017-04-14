@@ -85,6 +85,9 @@ class QueueAction extends InlineAction
 
     public function bindActionParams($params)
     {
+        if (!is_array($params)) {
+            return false;
+        }
         $method = new \ReflectionMethod($this->controller, $this->actionMethod);
 
         $args = [];
