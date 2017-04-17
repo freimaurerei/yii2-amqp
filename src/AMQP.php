@@ -50,10 +50,6 @@ class AMQP extends Component
     protected $queues = [];
     /** @var \AMQPExchange[] $exchanges */
     protected $exchanges = [];
-    /** @var bool $isTransaction */
-    public $isTransaction = false;
-
-    private $transactionalChannels = [];
 
     /** @var \AMQPQueue */
     private $delayedQueue = null;
@@ -94,35 +90,36 @@ class AMQP extends Component
     }
 
     /**
-     * @param $exchangeName
-     *
+     * @param      $exchangeName
+     * @param string|null $channelId
      * @return \AMQPExchange
      */
-    public function getExchange($exchangeName): \AMQPExchange
+    public function getExchange($exchangeName, $channelId = null): \AMQPExchange
     {
-        $exchange = $this->makeExchange($exchangeName);
+        $exchange = $this->makeExchange($exchangeName, $channelId);
 
         $aQueues = $this->getQueuesByExchangeName($exchangeName);
         foreach ($aQueues as $queue) {
-            $this->makeQueue($queue);
+            $this->makeQueue($queue, $channelId);
         }
 
         return $exchange;
     }
 
     /**
-     * @param $queueName
+     * @param      $queueName
      *
+     * @param string|null $channelId
      * @return \AMQPQueue
      */
-    public function getQueue($queueName): \AMQPQueue
+    public function getQueue($queueName, $channelId = null): \AMQPQueue
     {
         $aExchanges = $this->getExchangesByQueueName($queueName);
         foreach ($aExchanges as $exchangeName) {
-            $this->makeExchange($exchangeName);
+            $this->makeExchange($exchangeName, $channelId);
         }
 
-        $queue = $this->makeQueue($queueName);
+        $queue = $this->makeQueue($queueName, $channelId);
 
         return $queue;
     }
@@ -135,15 +132,12 @@ class AMQP extends Component
     {
         if (!$channelId) {
             $channelId = 'default';
-            if (isset($this->channels[$channelId])) {
-                return $this->channels[$channelId];
-            }
-            $channel   = $this->createAMQPChannel($channelId);
-            if ($this->isTransaction) {
-                $this->beginTransaction($channel);
-            }
         }
-        return $this->channels[$channelId] ?? null;
+        if (isset($this->channels[$channelId])) {
+            return $this->channels[$channelId];
+        }
+        $channel   = $this->createAMQPChannel($channelId);
+        return $channel;
     }
 
     /**
@@ -155,7 +149,7 @@ class AMQP extends Component
     }
 
     /**
-     * @param null $channelId
+     * @param string|null $channelId
      * @return \AMQPChannel
      */
     public function createAMQPChannel($channelId = null): \AMQPChannel
@@ -167,18 +161,18 @@ class AMQP extends Component
     }
 
     /**
-     * @param string $exchangeName
-     * @throws \RuntimeException
+     * @param string      $exchangeName
+     * @param null|string $channelId
      * @return \AMQPExchange
      */
-    protected function makeExchange(string $exchangeName): \AMQPExchange
+    protected function makeExchange(string $exchangeName, $channelId = null): \AMQPExchange
     {
         if (!isset($this->exchanges[$exchangeName])) {
             if (!isset($this->config['exchanges'][$exchangeName]) && $exchangeName !== '') {
                 throw new \RuntimeException("Could not find the exchange '$exchangeName' in config");
             }
 
-            $exchange = new \AMQPExchange($this->getChannel());
+            $exchange = new \AMQPExchange($this->getChannel($channelId));
 
             if (isset($this->config['exchanges'][$exchangeName])) {
                 $exchange->setName($exchangeName);
@@ -196,12 +190,12 @@ class AMQP extends Component
     }
 
     /**
-     * @param $queueName
+     * @param      $queueName
      *
+     * @param string|null $channelId
      * @return \AMQPQueue
-     * @throws \RuntimeException
      */
-    protected function makeQueue($queueName): \AMQPQueue
+    protected function makeQueue($queueName, $channelId = null): \AMQPQueue
     {
         if (!isset($this->queues[$queueName])) {
             if (!isset($this->config['queues'][$queueName])) {
@@ -209,7 +203,7 @@ class AMQP extends Component
             }
             $queueData = $this->config['queues'][$queueName];
 
-            $queue = new \AMQPQueue($this->getChannel());
+            $queue = new \AMQPQueue($this->getChannel($channelId));
             $queue->setName($queueName);
             $queue->setFlags($queueData['config']['flags']);
             $queue->setArguments($queueData['config']['arguments'] ?? []);
@@ -273,9 +267,9 @@ class AMQP extends Component
         }
     }
 
-    protected function makeDelayedQueue()
+    protected function makeDelayedQueue($channelId = null)
     {
-        $exchange = new \AMQPExchange($this->getChannel());
+        $exchange = new \AMQPExchange($this->getChannel($channelId));
         $exchange->setName($this->delayedExchangeName);
         $exchange->setType('x-delayed-message');
         $exchange->setFlags(\AMQP_DURABLE);
@@ -283,7 +277,7 @@ class AMQP extends Component
         $exchange->declareExchange();
         $this->delayedExchange = $exchange;
 
-        $queue = new \AMQPQueue($this->getChannel());
+        $queue = new \AMQPQueue($this->getChannel($channelId));
         $queue->setName($this->delayedQueueName);
         $queue->setFlags(\AMQP_DURABLE);
         $queue->declareQueue();
@@ -294,14 +288,15 @@ class AMQP extends Component
 
     /**
      * Send message by routingKey
-     * @param string     $exchange
-     * @param string     $routingKey
-     * @param            $message
-     * @param array|null $headers
+     * @param string      $exchange
+     * @param string      $routingKey
+     * @param             $message
+     * @param array|null  $headers
+     * @param string|null $channelId
      * @return bool
      * @throws \ErrorException
      */
-    public function send(string $exchange, string $routingKey, $message, array $headers = null): bool
+    public function send(string $exchange, string $routingKey, $message, array $headers = null, $channelId = null): bool
     {
         if ($message === null || $message === '') {
             throw new \ErrorException('AMQP message can not be empty');
@@ -314,7 +309,7 @@ class AMQP extends Component
             'delivery_mode' => 2
         ];
         $this->applyPropertyHeaders($properties, $headers);
-        $exchange = $this->getExchange($exchange);
+        $exchange = $this->getExchange($exchange, $channelId);
         if ($exchange->publish($message, $routingKey, AMQP_NOPARAM, $properties)) {
             \Yii::info(json_encode([
                 'data'   => $message,
@@ -330,10 +325,11 @@ class AMQP extends Component
      * @param string $queueName
      * @param        $callback
      * @param bool   $break
+     * @param string|null   $channelId
      */
-    public function listenQueue(string $queueName, $callback, bool $break = false)
+    public function listenQueue(string $queueName, $callback, bool $break = false, $channelId = null)
     {
-        $queue = $this->getQueue($queueName);
+        $queue = $this->getQueue($queueName, $channelId);
         while (true) {
             if (($message = $queue->get()) instanceof \AMQPEnvelope) {
                 if (call_user_func_array($callback, \yii\helpers\Json::decode($message->getBody()))) {
@@ -346,7 +342,34 @@ class AMQP extends Component
             }
         }
 
-        $this->queues[$queueName]->getChannel()->getConnection()->disconnect();
+        $this->getChannel($channelId)->getConnection()->disconnect();
+    }
+
+    public function beginTransaction($channels = null)
+    {
+        $channels = $this->getTransactionalChannels($channels);
+
+        $transaction = new Transaction($channels);
+        $transaction->begin();
+
+        return $transaction;
+    }
+
+    /**
+     * @param \AMQPChannel[]|\AMQPChannel|null $channels
+     * @return \AMQPChannel[]|array|null
+     */
+    private function getTransactionalChannels($channels = null)
+    {
+        if ($channels) {
+            if (!is_array($channels)) {
+                $channels = [$channels];
+            }
+        } else {
+            $channels = [$this->getChannel()];
+        }
+
+        return $channels;
     }
 
     /**
@@ -356,77 +379,6 @@ class AMQP extends Component
     public function getExchangeConfig(string $exchange): array
     {
         return ArrayHelper::getValue($this->config, $exchange, []);
-    }
-
-    /**
-     * Begin transaction
-     * @param \AMQPChannel $channel
-     * @return bool
-     * @internal param null $channelName
-     */
-    public function beginTransaction(\AMQPChannel $channel = null): bool
-    {
-        $channels = $channel ? [$channel,] : $this->channels;
-
-        if ($channels) {
-            foreach ($channels as $c) {
-                if (!in_array($c, $this->transactionalChannels)) {
-                    if (!$c->startTransaction()) {
-                        $this->rollback();
-                        return false;
-                    }
-                    $this->transactionalChannels[] = $c;
-                }
-            }
-        }
-        $this->isTransaction = true;
-
-        return true;
-    }
-
-    /**
-     * Commit transaction
-     * @param \AMQPChannel|null $channel
-     * @return bool
-     */
-    public function commit(\AMQPChannel $channel = null): bool
-    {
-        $transactionalChannels = $channel ? [$channel,] : $this->channels;
-
-        foreach ($transactionalChannels as $i=>$c) {
-            /** @var \AMQPChannel $c */
-            if (!$c->commitTransaction()) {
-                return false;
-            }
-            unset($this->transactionalChannels[$i]);
-        }
-
-        $this->isTransaction = false;
-
-        return true;
-    }
-
-    /**
-     * Rollback transaction
-     * @param \AMQPChannel|null $channel
-     * @return bool
-     * @internal param null $channelName
-     */
-    public function rollback(\AMQPChannel $channel = null)
-    {
-        $transactionalChannels = $channel ? [$channel,] : $this->transactionalChannels;
-
-        foreach ($transactionalChannels as $i=>$c) {
-            /** @var \AMQPChannel $c */
-            if (!$c->rollbackTransaction()) {
-                return false;
-            }
-            unset($this->transactionalChannels[$i]);
-        }
-
-        $this->isTransaction = false;
-
-        return true;
     }
 
     /**

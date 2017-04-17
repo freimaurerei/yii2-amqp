@@ -73,7 +73,7 @@ class QueueAction extends InlineAction
         /** @var QueueListener $controller */
         $controller = $this->controller;
         $queueName  = get_class($this->controller) . '::' . $this->actionMethod;
-        $queue      = $controller->amqp->getQueue($queueName);
+        $queue      = $controller->amqp->getQueue($queueName, __CLASS__);
         if ($queue) {
             while (true) {
                 $queue->consume([$this, 'handleMessage']); // todo think about this situation
