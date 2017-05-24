@@ -75,9 +75,7 @@ class QueueAction extends InlineAction
         $queueName  = get_class($this->controller) . '::' . $this->actionMethod;
         $queue      = $controller->amqp->getQueue($queueName, __CLASS__);
         if ($queue) {
-            while (true) {
-                $queue->consume([$this, 'handleMessage']); // todo think about this situation
-            }
+            $queue->consume([$this, 'handleMessage']); // todo think about this situation
         }
 
         return 0;
@@ -135,14 +133,26 @@ class QueueAction extends InlineAction
         $args = $this->bindActionParams(\yii\helpers\Json::decode($envelope->getBody()));
 
         if ($args === false) {
-            return false;
+            return true;
         }
 
         // good
-        $result = call_user_func_array(
-            [$this->controller, $this->actionMethod],
-            $args
-        );
+        try {
+            $result = call_user_func_array(
+                [$this->controller, $this->actionMethod],
+                $args
+            );
+        } catch (\yii\db\Exception $e) {
+            \Yii::error($e->getMessage() . $e->getTraceAsString());
+            if (strpos($e->getMessage(), 'MySQL server has gone away') !== false) {
+                return false;
+            }
+            $result = false;
+        } catch (\Throwable $e) {
+            \Yii::error($e->getMessage() . $e->getTraceAsString());
+            $result = false;
+        }
+
         if ($result) {
             \Yii::info(json_encode([
                 'data'   => $envelope->getBody(),
