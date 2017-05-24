@@ -139,10 +139,20 @@ class QueueAction extends InlineAction
         }
 
         // good
-        $result = call_user_func_array(
-            [$this->controller, $this->actionMethod],
-            $args
-        );
+        try {
+            $result = call_user_func_array(
+                [$this->controller, $this->actionMethod],
+                $args
+            );
+        } catch (\yii\db\Exception $e) {
+            if (strpos($e->getMessage(), 'MySQL server has gone away') !== false) {
+                \Yii::error($e->getMessage() . $e->getTraceAsString());
+                exit;
+            } else {
+                throw $e;
+            }
+        }
+
         if ($result) {
             \Yii::info(json_encode([
                 'data'   => $envelope->getBody(),
