@@ -75,8 +75,18 @@ class QueueAction extends InlineAction
         $queueName  = get_class($this->controller) . '::' . $this->actionMethod;
         $queue      = $controller->amqp->getQueue($queueName, __CLASS__);
         if ($queue) {
-            while (true) {
-                $queue->consume([$this, 'handleMessage']); // todo think about this situation
+            switch ($controller->mode) {
+                case QueueListener::MODE_DAEMON:
+                    while (true) {
+                        $queue->consume([$this, 'handleMessage']); // todo think about this situation
+                    }
+                    break;
+                case QueueListener::MODE_NODAEMON:
+                    $continue = true;
+                    while ($continue && ($envelope = $queue->get()) !== false) {
+                        $continue = $this->handleMessage($envelope, $queue);
+                    }
+                    break;
             }
         }
 

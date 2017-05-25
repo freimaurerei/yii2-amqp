@@ -13,6 +13,9 @@ use yii\base\InvalidConfigException;
  */
 abstract class QueueListener extends Controller
 {
+    const MODE_DAEMON = 'daemon';
+    const MODE_NODAEMON = 'no-daemon';
+
     /**
      * Actions config
      * Example:
@@ -69,6 +72,12 @@ abstract class QueueListener extends Controller
     public $useDelayQueue = false;
 
     /**
+     * Action mode
+     * @var string
+     */
+    public $mode = self::MODE_DAEMON;
+
+    /**
      * @inheritdoc
      * @throws InvalidConfigException
      */
@@ -122,7 +131,7 @@ abstract class QueueListener extends Controller
     {
         return array_merge(
             parent::options($actionId),
-            ['exchange', 'queue', 'break']
+            ['exchange', 'queue', 'break', 'mode']
         );
     }
 }
