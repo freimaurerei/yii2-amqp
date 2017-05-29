@@ -78,6 +78,11 @@ abstract class QueueListener extends Controller
     public $mode = self::MODE_DAEMON;
 
     /**
+     * @var string
+     */
+    public $actionClass = 'freimaurerei\yii2\amqp\actions\QueueAction';
+
+    /**
      * @inheritdoc
      * @throws InvalidConfigException
      */
@@ -111,7 +116,7 @@ abstract class QueueListener extends Controller
             if (method_exists($this, $methodName)) {
                 $method = new \ReflectionMethod($this, $methodName);
                 if ($method->isPublic() && $method->getName() === $methodName) {
-                    return new QueueAction($id, $this, $methodName, ['amqp' => $this->amqp]);
+                    return \Yii::createObject($this->actionClass, [$id, $this, $methodName, ['amqp' => $this->amqp]]);
                 }
             }
         }
