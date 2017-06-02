@@ -195,7 +195,6 @@ class QueueAction extends InlineAction
             }
         }
         $queue->ack($envelope->getDeliveryTag());
-
         return true;
     }
 
