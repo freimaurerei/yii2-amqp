@@ -136,11 +136,7 @@ class QueueAction extends InlineAction
             return true;
         }
 
-        // good
-        $result = call_user_func_array(
-            [$this->controller, $this->actionMethod],
-            $args
-        );
+        $result = $this->callAction($args);
         if ($result) {
             \Yii::info(json_encode([
                 'data'   => $envelope->getBody(),
@@ -215,5 +211,17 @@ class QueueAction extends InlineAction
                 }
                 return;
         }
+    }
+
+    /**
+     * @param $args
+     * @return mixed
+     */
+    protected function callAction($args): mixed
+    {
+        return call_user_func_array(
+            [$this->controller, $this->actionMethod],
+            $args
+        );
     }
 }
