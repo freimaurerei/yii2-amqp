@@ -215,9 +215,9 @@ class QueueAction extends InlineAction
 
     /**
      * @param $args
-     * @return mixed
+     * @return bool
      */
-    protected function callAction($args): mixed
+    protected function callAction($args)
     {
         return call_user_func_array(
             [$this->controller, $this->actionMethod],
