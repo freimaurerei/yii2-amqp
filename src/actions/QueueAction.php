@@ -133,10 +133,11 @@ class QueueAction extends InlineAction
         $args = $this->bindActionParams(\yii\helpers\Json::decode($envelope->getBody()));
 
         if ($args === false) {
-            return true;
+            $result = false;
+        } else {
+            $result = $this->callAction($args);
         }
 
-        $result = $this->callAction($args);
         if ($result) {
             \Yii::info(json_encode([
                 'data'   => $envelope->getBody(),
@@ -145,15 +146,15 @@ class QueueAction extends InlineAction
             ]), AMQP::$logCategory);
         } else {
             ++$redeliveredCount;
-            if ($this->amqp->delayQueueUsage) {
-                if ($redeliveredCount > $this->maxRetryCount) {
-                    \Yii::info("Message could not be processed {$this->retryCount} times. The message was deleted."
-                        . json_encode([
-                            'data'   => $envelope->getBody(),
-                            'route'  => $envelope->getRoutingKey(),
-                            'status' => AMQP::MESSAGE_STATUS_ACK
-                        ]), AMQP::$logCategory);
-                } else {
+            if ($redeliveredCount > $this->maxRetryCount) {
+                \Yii::info("Message could not be processed {$this->maxRetryCount} times. The message was deleted."
+                    . json_encode([
+                        'data'   => $envelope->getBody(),
+                        'route'  => $envelope->getRoutingKey(),
+                        'status' => AMQP::MESSAGE_STATUS_ACK
+                    ]), AMQP::$logCategory);
+            } else {
+                if ($this->amqp->delayQueueUsage) {
                     $delayedTime = null;
                     if ($this->retryBoundaryCount <= $redeliveredCount) {
                         $delayedTime = $envelope->getHeader('x-delay');
@@ -173,21 +174,21 @@ class QueueAction extends InlineAction
                             ]
                         ]
                     );
+                } else {
+                    $this->amqp->send(
+                        '',
+                        $queue->getName(),
+                        $envelope->getBody(),
+                        [
+                            'x-redelivered-count' => $redeliveredCount
+                        ]
+                    );
+                    \Yii::info(json_encode([
+                        'data'   => $envelope->getBody(),
+                        'route'  => $envelope->getRoutingKey(),
+                        'status' => AMQP::MESSAGE_STATUS_NACK
+                    ]), AMQP::$logCategory);
                 }
-            } else {
-                $this->amqp->send(
-                    '',
-                    $queue->getName(),
-                    $envelope->getBody(),
-                    [
-                        'x-redelivered-count' => $redeliveredCount
-                    ]
-                );
-                \Yii::info(json_encode([
-                    'data'   => $envelope->getBody(),
-                    'route'  => $envelope->getRoutingKey(),
-                    'status' => AMQP::MESSAGE_STATUS_NACK
-                ]), AMQP::$logCategory);
             }
         }
         $queue->ack($envelope->getDeliveryTag());
